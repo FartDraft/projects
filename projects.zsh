@@ -1,10 +1,14 @@
-projects_path=~/.projects
+file=~/.projects
+if [[ ! -e "$file" ]]; then
+    touch "$file"
+fi
+
 names=() descriptions=() paths=()
 names_max_len=0 descriptions_max_len=0 paths_max_len=0
-total=0 i=0
+total=0 lines=0
 
-function projects_add_line() {
-    case $((i % 3)) in
+function add_line() {
+    case $((lines % 3)) in
         0)
             names+=("$1")
             if ((${#1} > names_max_len)); then
@@ -24,50 +28,42 @@ function projects_add_line() {
             fi
             ((total++))
         ;;
-        *)
-            echo "Error"
-        ;;
     esac
-    ((i++))
+    ((lines++))
 }
 
-function projects_read_file() {
-    while read -r line; do
-        projects_add_line "$line"
-    done < "$projects_path"
-    if ((i % 3 != 0)); then
-        echo "$i"
-        echo "Invalid file format: $projects_path"
-    fi
-}
-projects_read_file
+# Read from $file
+while read -r line; do
+    add_line "$line"
+done < "$file"
 
 reset="\033[0m"
 yellow="\033[1;33m"
 red="\033[0;31m"
 blue="\033[0;34m"
-function projects_list() {
+function list() {
     echo "Projects:"
-    for i in {1..$total}; do
-        echo -n    "    $i. "
-        echo -n -e "${yellow}${(r($names_max_len)(  ))names[$i]} "
-        echo -n -e "${red}${(r($descriptions_max_len)(  ))descriptions[$i]} "
-        echo    -e "${blue}${(r($paths_max_len)(  ))paths[$i]}${reset}"
+    for lines in {1..$total}; do
+        echo -n    "    $lines. "
+        echo -n -e "${yellow}${(r($names_max_len)(  ))names[$lines]} "
+        echo -n -e "${red}${(r($descriptions_max_len)(  ))descriptions[$lines]} "
+        echo    -e "${blue}${(r($paths_max_len)(  ))paths[$lines]}${reset}"
     done
 }
 
-function projects_add() {
+function add() {
     if [[ -z $1 ]]; then
         echo "Usage: projects add <name> <description>"
     else
-        echo "$1" >> "$projects_path"
-        projects_add_line "$1"
-        echo "$2" >> "$projects_path"
-        projects_add_line "$2"
-        echo "$PWD" >> $projects_path
-        projects_add_line "$PWD"
+        echo "$1" >> "$file"
+        add_line "$1"
+        echo "$2" >> "$file"
+        add_line "$2"
+        echo "$PWD" >> $file
+        add_line "$PWD"
+    fi
     fi
 }
 
-alias p=projects_list
-alias pa=projects_add
+alias p=list
+alias pa=add
