@@ -1,4 +1,5 @@
 file=~/.projects
+hook='nvim .'
 if [[ ! -e "$file" ]]; then
     touch "$file"
 fi
@@ -6,6 +7,12 @@ fi
 names=() descriptions=() paths=()
 names_max_len=0 descriptions_max_len=0 paths_max_len=0
 total=0 lines=0
+
+reset="\033[0m"
+red="\033[0;31m"
+yellow="\033[1;33m"
+green="\033[0;32m"
+blue="\033[0;34m"
 
 function read_projects() {
     names=() descriptions=() paths=()
@@ -36,18 +43,17 @@ function read_projects() {
         esac
         ((lines++))
     done < "$file"
+
+    if ((lines % 3 != 0)); then
+        return 1
+    fi
 }
 
-reset="\033[0m"
-yellow="\033[1;33m"
-green="\033[0;32m"
-blue="\033[0;34m"
-function list() {
-    read_projects
+function list_projects() {
     if [[ $total == 0 ]]; then
-        echo "No projects yet"
+        echo 'No projects yet'
     else
-        echo "Projects:"
+        echo 'Projects:'
         for line in {1..$total}; do
             echo -n    "    $line. "
             echo -n -e "${yellow}${(r($names_max_len)(  ))names[$line]} "
@@ -57,52 +63,88 @@ function list() {
     fi
 }
 
-function add() {
-    read_projects
-    if [[ -z $1 ]]; then
-        echo "Usage: projects add <name> <description>"
-    else
-        for i in {1..$total}; do
-            if [[ $1 == ${names[i]} ]]; then
-                echo "Project with the same name already exists"
-                return
-            elif [[ $PWD == ${paths[i]} ]]; then
-                echo "Project with the same path already exists"
-                return
-            fi
-        done
+function add_project() {
+    for i in {1..$total}; do
+        if [[ $1 == ${names[i]} ]]; then
+            echo 'Project with the same name already exists'
+            return
+        elif [[ $PWD == ${paths[i]} ]]; then
+            echo 'Project with the same path already exists'
+            return
+        fi
+    done
 
-        echo "$1"   >> "$file"
-        echo "$2"   >> "$file"
-        echo "$PWD" >> "$file"
-    fi
+    echo "$1"   >> "$file"
+    echo "$2"   >> "$file"
+    echo "$PWD" >> "$file"
 }
 
-function delete() {
-    read_projects
-    line=-1
-    if [[ -z $1 ]]; then
-        echo "Usage: projects delete <name>"
+function delete_project() {
+    for i in {1..$total}; do
+        if [[ $1 == ${names[i]} ]]; then
+            line=$((1 + 3*(i-1)))
+            sed -i "${line}d" "$file"
+            sed -i "${line}d" "$file"
+            sed -i "${line}d" "$file"
+            return
+        fi
+    done
+
+    echo 'No such project'
+}
+
+function go_to_project() {
+    if [[ -z "$1" ]]; then
+        echo 'No project name'
     else
+        finded=0
         for i in {1..$total}; do
             if [[ $1 == ${names[i]} ]]; then
-                line=$((1 + 3*(i-1)))
-                sed -i "${line}d" "$file"
-                sed -i "${line}d" "$file"
-                sed -i "${line}d" "$file"
-                break
+                finded=1
+                cd -q ${paths[i]}
+                eval $hook
             fi
         done
-        if [[ $line == -1 ]]; then
-            echo "No such project"
-        else
-            ((lines-=3))
-            ((total--))
-            read_projects
+        if [[ $finded == 0 ]]; then
+            echo 'No such project'
         fi
     fi
 }
 
-alias p=list
-alias pa=add
-alias pd=delete
+function reset_projects() {
+    truncate --size 0 "$file"
+}
+
+function help_projects() {
+    echo 'Usage: p [<name>] [-l] [-a <name> <description>] [-d <name>] [-R] [-h]'
+    echo 'List, Add, Delete and Go to projects.'
+    echo '      :   go to project'
+    echo '    -l:   list projects'
+    echo '    -a:   add project'
+    echo '    -d:   delete project'
+    echo '    -R:   reset projects file'
+    echo '    -h:   help'
+}
+
+function projects() {
+    if ! read_projects; then
+        echo "${red}File $file is corrupted${reset}"
+        return
+    fi
+
+    if [[ $1 == '-l' ]]; then
+        list_projects
+    elif [[ $1 == '-a' ]]; then
+        add_project $2 $3
+    elif [[ $1 == '-d' ]]; then
+        delete_project $2
+    elif [[ $1 == '-R' ]]; then
+        reset_projects
+    elif [[ $1 == '-h' ]]; then
+        help_projects
+    else
+        go_to_project $1
+    fi
+}
+
+alias p=projects
