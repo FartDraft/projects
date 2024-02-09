@@ -1,5 +1,5 @@
 file=~/.projects
-hook='nvim .'
+hook='neovide .'
 if [[ ! -e "$file" ]]; then
     touch "$file"
 fi
